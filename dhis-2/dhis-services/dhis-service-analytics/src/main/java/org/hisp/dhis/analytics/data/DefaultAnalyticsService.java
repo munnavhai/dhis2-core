@@ -29,6 +29,7 @@ package org.hisp.dhis.analytics.data;
  */
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
 import static org.hisp.dhis.analytics.DataQueryParams.*;
 import static org.hisp.dhis.common.DataDimensionItemType.PROGRAM_ATTRIBUTE;
 import static org.hisp.dhis.common.DataDimensionItemType.PROGRAM_DATA_ELEMENT;
@@ -484,7 +485,9 @@ public class DefaultAnalyticsService
 
             List<Indicator> indicators = asTypedList( dataSourceParams.getIndicators() );
 
-            List<Period> filterPeriods = dataSourceParams.getTypedFilterPeriods();
+            List<Period> filterPeriods = isNotEmpty( dataSourceParams.getTypedFilterPeriods() )
+                ? dataSourceParams.getTypedFilterPeriods()
+                : dataSourceParams.getStartEndDatesToSingleList();
 
             Map<String, Double> constantMap = constantService.getConstantMap();
 
@@ -824,6 +827,28 @@ public class DefaultAnalyticsService
             Grid eventGrid = eventAnalyticsService.getAggregatedEventData( eventQueryParams );
 
             grid.addRows( eventGrid );
+
+            replaceGridIfNeeded( grid, eventGrid );
+        }
+    }
+
+    /**
+     * This method will replace the headers in the current grid by the event grid
+     * IF, and only IF, there is a mismatch between the current grid and the event
+     * grid headers.
+     *
+     * @param grid the current/actual grid
+     * @param eventGrid the event grid
+     */
+    private void replaceGridIfNeeded( final Grid grid, final Grid eventGrid )
+    {
+        final boolean eventGridHasAdditionalHeaders = grid.getHeaderWidth() < eventGrid.getHeaderWidth();
+        final boolean eventHeaderSizeIsSameAsGridColumns = eventGrid.getHeaderWidth() == eventGrid.getWidth();
+
+        // Replacing the current grid headers by the actual event grid headers.
+        if ( eventGridHasAdditionalHeaders && eventHeaderSizeIsSameAsGridColumns )
+        {
+            grid.replaceHeaders( eventGrid.getHeaders() );
         }
     }
 
@@ -1008,6 +1033,8 @@ public class DefaultAnalyticsService
         {
             for ( String dimension : columns )
             {
+                reportTable.addDimensionDescriptor( dimension, params.getDimension( dimension ).getDimensionType() );
+
                 reportTable.getColumnDimensions().add( dimension );
                 tableColumns.add( params.getDimensionItemsExplodeCoc( dimension ) );
             }
@@ -1017,6 +1044,8 @@ public class DefaultAnalyticsService
         {
             for ( String dimension : rows )
             {
+                reportTable.addDimensionDescriptor( dimension, params.getDimension( dimension ).getDimensionType() );
+
                 reportTable.getRowDimensions().add( dimension );
                 tableRows.add( params.getDimensionItemsExplodeCoc( dimension ) );
             }
